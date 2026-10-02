@@ -1,0 +1,97 @@
+`timescale 1ns / 1ps
+
+module tb_car_safety;
+
+    reg  [15:0] SW;
+    wire [15:0] LED;
+
+    integer errors;
+
+    car_safety DUT (
+        .SW(SW),
+        .LED(LED)
+    );
+
+    // Safe baseline: passenger absent, service mode OFF.
+    localparam [15:0] SAFE = 16'hFF98;
+
+    // Each test lasts 100 ns.
+    task check_case;
+        input integer row;
+        input [15:0] switches;
+        input [15:0] expected;
+        begin
+            SW = switches;
+            #1;
+
+            if (LED !== expected) begin
+                $display("FAIL row %0d: expected %h, got %h",
+                         row, expected, LED);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS row %0d: LED = %h", row, LED);
+            end
+
+            #99;
+        end
+    endtask
+
+    initial begin
+        errors = 0;
+        SW = SAFE;
+
+        // Row 1: Key removed
+        check_case(1, SAFE & ~16'h2000, 16'h0000);
+
+        // Row 2: No faults
+        check_case(2, SAFE, 16'h8000);
+
+        // Row 3: Driver seatbelt unfastened
+        check_case(3, SAFE & ~16'h8000, 16'h5800);
+
+        // Row 4: Passenger occupied, passenger belt unfastened
+        check_case(4, SAFE | 16'h0040, 16'hD800);
+
+        // Row 5: Driver door open
+        check_case(5, SAFE & ~16'h4000, 16'h5400);
+
+        // Row 6: Airbag fault
+        check_case(6, SAFE & ~16'h0100, 16'hD040);
+
+        // Row 7: Hood open
+        check_case(7, SAFE & ~16'h0400, 16'h2200);
+
+        // Row 8: Hood open, service ON, parking brake engaged
+        check_case(8, (SAFE & ~16'h0400) | 16'h0004,
+                   16'hA200);
+
+        // Row 9: Trunk open
+        check_case(9, SAFE & ~16'h0010, 16'hA100);
+
+        // Row 10: Battery fault
+        check_case(10, SAFE & ~16'h0200, 16'h2080);
+
+        // Row 11: Temperature fault
+        check_case(11, SAFE & ~16'h0080, 16'hA020);
+
+        // Row 12: Brake pedal not pressed
+        check_case(12, SAFE & ~16'h1000, 16'h0000);
+
+        // Row 13: Not in Park, parking brake engaged
+        check_case(13, SAFE & ~16'h0800, 16'h4000);
+
+        // Row 14: Driver unbuckled and trunk open
+        check_case(14, SAFE & ~16'h8010, 16'h5900);
+
+        if (errors == 0)
+            $display("ALL 14 TESTS PASSED");
+        else
+            $display("%0d TESTS FAILED", errors);
+
+        $finish;
+    end
+
+endmodule
+
+
