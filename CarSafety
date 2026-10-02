@@ -1,0 +1,88 @@
+`timescale 1ns / 1ps
+
+module car_safety (
+    input  wire [15:0] SW,
+    output wire [15:0] LED
+);
+
+    // Input signals
+    wire SB       = SW[15];
+    wire DOOR     = SW[14];
+    wire KEY      = SW[13];
+    wire BRK      = SW[12];
+    wire PARK     = SW[11];
+    wire HOOD     = SW[10];
+    wire BAT_OK   = SW[9];
+    wire AIB_OK   = SW[8];
+    wire TMP_OK   = SW[7];
+    wire PASS_OCC = SW[6];
+    wire SB_P     = SW[5];
+    wire TRUNK    = SW[4];
+    wire PBRK     = SW[3];
+    wire SRV      = SW[2];
+
+    // Warning signals
+    wire seat_warn;
+    wire door_warn;
+    wire hood_warn;
+    wire trunk_warn;
+    wire bat_warn;
+    wire airbag_warn;
+    wire temp_warn;
+
+    wire priority1;
+    wire priority2;
+    wire hood_permit;
+    wire start_permit;
+    wire chime;
+
+    // Individual warnings
+    assign seat_warn   = ~SB | (PASS_OCC & ~SB_P);
+    assign door_warn   = ~DOOR;
+    assign hood_warn   = ~HOOD;
+    assign trunk_warn  = ~TRUNK;
+    assign bat_warn    = ~BAT_OK;
+    assign airbag_warn = ~AIB_OK;
+    assign temp_warn   = ~TMP_OK;
+
+    // Highest-priority warning group
+    assign priority1 = seat_warn | door_warn | airbag_warn;
+
+    // Second-priority group, suppressed by priority1
+    assign priority2 = ~priority1 &
+                      (hood_warn | trunk_warn |
+                       bat_warn | temp_warn);
+
+    // An open hood is permitted only with
+    // service mode ON and parking brake engaged.
+    assign hood_permit = HOOD | (SRV & PBRK);
+
+    // SW2 must be ON to allow starting.
+    // SW2 OFF always forces LED15 OFF.
+    assign start_permit = SRV & KEY & BRK & PARK &
+                          SB & DOOR & BAT_OK &
+                          hood_permit;
+
+    // Warning chime requires the key.
+    assign chime = KEY &
+                   (priority1 | (~PARK & PBRK));
+
+    // Output LEDs
+    assign LED[15] = start_permit;
+    assign LED[14] = chime;
+    assign LED[13] = priority2;
+    assign LED[12] = priority1;
+    assign LED[11] = seat_warn;
+    assign LED[10] = door_warn;
+    assign LED[9]  = hood_warn;
+    assign LED[8]  = trunk_warn;
+    assign LED[7]  = bat_warn;
+    assign LED[6]  = airbag_warn;
+    assign LED[5]  = temp_warn;
+
+    // Unused LEDs
+    assign LED[4:0] = 5'b00000;
+
+endmodule
+
+
